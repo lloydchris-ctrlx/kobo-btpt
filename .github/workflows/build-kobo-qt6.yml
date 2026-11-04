@@ -1,0 +1,72 @@
+
+name: Build Kobo Bluetooth Page Turner (Qt6)
+
+on:
+  push:
+    branches:
+      - qt6-firmware
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: kobo-btpt
+
+      - name: Free build space
+        run: |
+          df -h
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          docker system prune -af
+          df -h
+
+      - name: Download Qt6-compatible NickelHook
+        run: |
+          git clone --depth 1 \
+            https://github.com/open-source-arena/Nickelite.git \
+            Nickelite
+
+      - name: Build Kobo Qt6 toolchain
+        run: |
+          docker build \
+            -t kobo-qt6-toolchain \
+            -f Nickelite/toolchain/qt6/Dockerfile \
+            Nickelite/toolchain/qt6
+
+      - name: Compile Bluetooth plugin
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$PWD:/work" \
+            -w /work/kobo-btpt \
+            kobo-qt6-toolchain \
+            make NH_QT_MAJOR=6 \
+              NICKELHOOK=/work/Nickelite/NickelHook/ \
+              all kobo
+
+      - name: Verify installation package
+        run: |
+          set -e
+          test -s kobo-btpt/Kobo.tgz
+          mkdir -p verify
+          tar -xzf kobo-btpt/Kobo.tgz -C verify
+          test -s verify/imageformats/libbtpt.so
+          file verify/imageformats/libbtpt.so
+          file verify/imageformats/libbtpt.so | grep -q ARM
+          tar -tzf kobo-btpt/Kobo.tgz
+          sha256sum kobo-btpt/Kobo.tgz
+
+      - name: Upload Kobo installation package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kobo-btpt-qt6
+          path: kobo-btpt/Kobo.tgz
+          if-no-files-found: error
+          retention-days: 7
