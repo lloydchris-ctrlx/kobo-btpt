@@ -102,6 +102,7 @@ bool BluetoothPageTurner::addDevice(
 	/* Found a config file and a /dev/input handler, so configure device */
 	Device &device = devices[uniq];
 	device.fd = fd;
+	device.name = name;
 	device.cfg.clear();
 
 	QByteArray text = cfg.readAll();
@@ -327,6 +328,27 @@ void BluetoothPageTurner::run()
 				it = devices.erase(it);
 				continue;
 			}
+
+			/* Diagnostic logging for the UBeesize remote only */
+		if (device.name == "UBeesize") {
+   			 QFile logFile(BTPT_DIR "UBeesize-events.log");
+
+   			 if (logFile.open(QIODevice::WriteOnly |
+                     		QIODevice::Append |
+                     		QIODevice::Text)) {
+
+       			 if (logFile.size() < 65536) {
+           			 QTextStream out(&logFile);
+
+          		 	 out << "type=" << e.type
+              		 	 << " code=" << e.code
+               		 	<< " value=" << e.value
+               		 	<< "\n";
+        }
+
+       			 logFile.close();
+    }
+}
 
 			if (e.type == 0x00 &&
 			    e.code == 0x00 &&
