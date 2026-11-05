@@ -16,6 +16,7 @@ class Device
 {
 public:
 	int fd;
+ 	QString name;
 	QList<QPair<struct input_event, QString>> cfg;
 };
 
